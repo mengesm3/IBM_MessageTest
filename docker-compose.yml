@@ -1,0 +1,42 @@
+secrets:
+ mqAppPassword:
+  file: ./secrets/mqAppPassword.txt
+ mqAdminPassword:
+  file: ./secrets/mqAdminPassword.txt
+
+services:
+ ibmmq:
+  image: icr.io/ibm-messaging/mq:latest
+  container_name: ibmmq
+  environment:
+   - LICENSE=accept
+   - MQ_QMGR_NAME=QM1
+  secrets:
+   - mqAppPassword
+   - mqAdminPassword
+  ports:
+   - "1414:1414"
+   - "9443:9443"
+  healthcheck:
+   test: ["CMD", "dspmq", "-m", "QM1"]
+   interval: 5s
+   timeout: 5s
+   retries: 10
+   start_period: 20s   # give the container time to finish its create→restart cycle
+ mq-messageclient:
+  build:
+   context: .
+   dockerfile: Dockerfile.client
+  container_name: mq-client
+  depends_on:
+   ibmmq:
+    condition: service_healthy
+    
+ mq-messagegetter:
+  build:
+   context: .
+   dockerfile: Dockerfile.getter
+  container_name: mq-getter
+  depends_on:
+   mq-messageclient:
+    condition: service_completed_successfully

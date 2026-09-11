@@ -1,0 +1,48 @@
+FROM ubuntu:24.04 AS builder
+
+    ENV DEBIAN_FRONTEND=noninteractive
+
+    RUN apt-get update && apt-get install -y \
+        build-essential \
+        cmake \
+        tar \
+        && rm -rf /var/lib/apt/lists/*
+
+    RUN mkdir -p /opt/mqm
+    COPY 10.0.0.0-IBM-MQ-Advanced-for-Developers-UbuntuLinuxX64.tar.gz /opt/mqm/MQC.tar.gz
+    RUN tar -C /opt/mqm -xzf /opt/mqm/MQC.tar.gz && rm /opt/mqm/MQC.tar.gz
+
+    RUN cd /opt/mqm/MQServer \
+        && chmod +x mqlicense.sh \
+        && ./mqlicense.sh -accept \
+        && apt-get update \
+        && apt-get install -y \
+            ./ibmmq-runtime_10.0.0.0_amd64.deb \
+            ./ibmmq-gskit_10.0.0.0_amd64.deb \
+            ./ibmmq-client_10.0.0.0_amd64.deb \
+            ./ibmmq-sdk_10.0.0.0_amd64.deb \
+        && rm -rf /var/lib/apt/lists/* \
+        && rm -rf /opt/mqm/MQServer
+
+    WORKDIR /app
+    COPY mq_messagegetter.cpp .
+
+    ENV CPLUS_INCLUDE_PATH=/opt/mqm/inc
+    ENV LIBRARY_PATH=/opt/mqm/lib64
+
+    RUN g++ -O3 mq_messagegetter.cpp -o mq_messagegetter -limqc23gl -limqb23gl -lmqic
+
+    FROM ubuntu:24.04 AS runtime
+
+    WORKDIR /app
+
+    # Full /opt/mqm tree copy - confirmed as the reliable working
+    # configuration for mq-messageclient; applying identically here.
+    COPY --from=builder /opt/mqm /opt/mqm
+    COPY --from=builder /app/mq_messagegetter /usr/local/bin/mq_messagegetter
+
+    RUN mkdir -p /var/mqm && chmod 777 /var/mqm
+
+    ENV LD_LIBRARY_PATH=/opt/mqm/lib64
+
+    CMD ["/usr/local/bin/mq_messagegetter"]

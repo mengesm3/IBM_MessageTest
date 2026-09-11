@@ -1,0 +1,54 @@
+FROM ubuntu:24.04 AS builder
+
+    ENV DEBIAN_FRONTEND=noninteractive
+
+    RUN apt-get update && apt-get install -y \
+        build-essential \
+        cmake \
+        tar \
+        && rm -rf /var/lib/apt/lists/*
+
+    RUN mkdir -p /opt/mqm
+    COPY 10.0.0.0-IBM-MQ-Advanced-for-Developers-UbuntuLinuxX64.tar.gz /opt/mqm/MQC.tar.gz
+    RUN tar -C /opt/mqm -xzf /opt/mqm/MQC.tar.gz && rm /opt/mqm/MQC.tar.gz
+
+    # Accept the license and install only the components needed to compile
+    # and link a client application: runtime (base), gskit (TLS dependency),
+    # client (libmqic.so etc.), and sdk (headers, incl. imqi.hpp, and
+    # compile-time libs like libimqc23gl.so).
+    # NOTE: apt-get update is required again here because the earlier apt
+    # step wiped /var/lib/apt/lists/* - without it, apt cannot resolve any
+    # dependencies these .debs might need from the Ubuntu repos.
+    RUN cd /opt/mqm/MQServer \
+        && chmod +x mqlicense.sh \
+        && ./mqlicense.sh -accept \
+        && apt-get update \
+        && apt-get install -y \
+            ./ibmmq-runtime_10.0.0.0_amd64.deb \
+            ./ibmmq-gskit_10.0.0.0_amd64.deb \
+            ./ibmmq-client_10.0.0.0_amd64.deb \
+            ./ibmmq-sdk_10.0.0.0_amd64.deb \
+        && rm -rf /var/lib/apt/lists/* \
+        && rm -rf /opt/mqm/MQServer
+
+    WORKDIR /app
+    COPY mq_messageclient.cpp .
+
+    ENV CPLUS_INCLUDE_PATH=/opt/mqm/inc
+    ENV LIBRARY_PATH=/opt/mqm/lib64
+
+    RUN g++ -O3 mq_messageclient.cpp -o mq_messageclient -limqc23gl -limqb23gl -lmqic
+
+FROM ubuntu:24.04 AS runtime
+
+    WORKDIR /app
+
+    COPY --from=builder /opt/mqm /opt/mqm
+    COPY --from=builder /app/mq_messageclient /usr/local/bin/mq_messageclient
+
+    RUN mkdir -p /var/mqm && chmod 777 /var/mqm
+
+    ENV LD_LIBRARY_PATH=/opt/mqm/lib64
+    ENV MQSAMP_USER_ID="vboxuser"
+
+    CMD ["/usr/local/bin/mq_messageclient"]
