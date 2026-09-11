@@ -61,7 +61,7 @@ You can also log into the IBM MQ web console at `https://localhost:9443/ibmmq/co
 
 ## Obtaining the MQ Installer
 
-This repository does **not** include the IBM MQ installer tarball, as it is a large, licensed IBM distribution file. Download `10.0.0.0-IBM-MQ-Advanced-for-Developers-UbuntuLinuxX64.tar.gz` from IBM's official developer downloads, and place it in the root of this project directory (alongside `Dockerfile.client`) before building.
+This repository does **not** include the IBM MQ installer tarball, as it is a large, licensed IBM distribution file. Download `10.0.0.0-IBM-MQ-Advanced-for-Developers-UbuntuLinuxX64.tar.gz` from IBM's official developer downloads, and place it in the root of this project directory (alongside `Dockerfile.client`) before building. Step 2 [here](https://developer.ibm.com/tutorials/mq-connect-app-queue-manager-ubuntu/) will get you to the download page as well.
 
 ## Secrets Setup
 
